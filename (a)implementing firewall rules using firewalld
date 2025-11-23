@@ -1,0 +1,131 @@
+Firewalld is a dynamic firewall manager that allows you to define which network traffic is allowed or blocked. It simplifies firewall management using zones and services.
+IDS/IPS (Intrusion Detection/Prevention Systems) monitor network activity to detect and respond to threats. Suricata is a popular open-source IDS/IPS used on Linux systems.
+Combining Firewalld with Suricata ensures your Fedora server is secure, monitored, and resilient against attacks.
+
+ Firewalld Setup
+..................
+Check Firewalld Status
+sudo systemctl status firewalld
+
+Active: running
+If inactive: start it:
+
+sudo systemctl start firewalld
+sudo systemctl enable firewalld
+
+Zones Overview
+..............
+Firewalld uses zones to define trust levels for network connections.
+sudo firewall-cmd --get-zones
+
+Common zones:
+public	Default for unknown networks
+trusted	Full access for trusted networks
+work	Moderate restrictions for work networks
+home	Less restrictive for home networks
+
+Change default zone (optional):
+sudo firewall-cmd --set-default-zone=public
+
+Add Services
+Open common services:
+ HTTP (port 80)
+sudo firewall-cmd --zone=public --add-service=http --permanent
+ HTTPS (port 443)
+sudo firewall-cmd --zone=public --add-service=https --permanent
+ SSH (port 22)
+sudo firewall-cmd --zone=public --add-service=ssh --permanent
+Add Custom Ports
+sudo firewall-cmd --zone=public --add-port=8080/tcp --permanent
+sudo firewall-cmd --zone=public --add-port=3306/tcp --permanent
+
+
+Reload rules:
+sudo firewall-cmd --reload
+
+List Active Rules
+sudo firewall-cmd --zone=public --list-all
+
+
+Example output:
+public (active)
+  services: ssh http https
+  ports: 8080/tcp 3306/tcp
+  masquerade: yes
+  forward-ports: 
+  rich rules:
+
+Remove Rules
+sudo firewall-cmd --zone=public --remove-service=http --permanent
+sudo firewall-cmd --zone=public --remove-port=8080/tcp --permanent
+sudo firewall-cmd --reload
+
+Masquerading / NAT
+.....................
+Enable NAT for routing internal network traffic:
+sudo firewall-cmd --zone=public --add-masquerade --permanent
+sudo firewall-cmd --reload
+
+Example: if your Fedora server acts as a gateway, clients behind it can access the internet.
+
+Logging
+........
+Enable logging for a zone:
+sudo firewall-cmd --zone=public --add-forward-port=port=514:proto=udp:toport=514:toaddr=192.168.193.128 --permanent
+sudo firewall-cmd --reload
+Logs are useful for monitoring blocked/allowed traffic.
+
+Advanced: Rich Rules
+....................
+Rich rules allow fine-grained control over traffic:
+
+sudo firewall-cmd --zone=public \
+--add-rich-rule='rule family="ipv4" source address="192.168.193.0/24" port port="22" protocol="tcp" accept' --permanent
+sudo firewall-cmd --reload
+Accept SSH traffic only from 192.168.190.0/24.(your network)
+
+Intrusion Detection and Prevention (IDS/IPS) with Suricata
+...........................................................
+Install Suricata
+sudo dnf install suricata
+
+Configure Suricata
+Edit configuration:
+sudo nano /etc/suricata/suricata.yaml
+
+Important settings:
+interface: ens160 → network interface to monitor
+rule-path: /etc/suricata/rules/ → where rules are stored
+logging: → configure output location
+thresholds: → adjust alert thresholds
+
+Download and Update Rules
+sudo suricata-update
+Pulls latest rules from Emerging Threats (ET) and Snort.
+
+Start Suricata
+sudo systemctl start suricata
+sudo systemctl enable suricata
+
+Monitor Logs
+cat /var/log/suricata/fast.log
+
+Enable IPS Mode
+# Edit suricata.yaml and set:
+--set suricata_mode=IPS
+
+NOTE: IPS actively blocks suspicious traffic. Test carefully to avoid blocking legitimate connections.
+
+Fine-Tuning Rules
+.................
+Modify existing rules or create custom ones.
+Focus on critical threats to reduce false positives.
+
+Example: block repeated SSH login attempts from suspicious IPs.
+
+
+Regular Updates: Keep Suricata and rules current.
+Testing: Test firewall and IPS changes in a safe environment.
+Monitoring Plan: Respond promptly to alerts.
+
+Skill Development: Stay updated on network security trends.
