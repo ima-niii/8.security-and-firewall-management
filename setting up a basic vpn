@@ -1,0 +1,137 @@
+This chapter guides you through installing and configuring OpenVPN on a Fedora Server and connecting to it from a Windows client.
+
+Client Configuration File: nbashir-vpn.ovpn
+
+️ Install OpenVPN on Fedora
+sudo dnf install openvpn
+
+️ Configure OpenVPN Server
+Create Server Directory
+sudo mkdir -p /etc/openvpn/server
+
+Copy Sample Configuration
+sudo cp /usr/share/doc/openvpn/sample/sample-config-files/server.conf /etc/openvpn/server/
+
+Edit Server Configuration
+sudo nano /etc/openvpn/server/server.conf
+
+
+Example recommended settings:
+
+port 1194
+proto udp
+dev tun
+ca /etc/openvpn/server/ca.crt
+cert /etc/openvpn/server/server.crt
+key /etc/openvpn/server/server.key
+dh /etc/openvpn/server/dh.pem
+server 10.8.0.0 255.255.255.0
+push "redirect-gateway def1 bypass-dhcp"
+push "dhcp-option DNS 8.8.8.8"
+push "dhcp-option DNS 8.8.4.4"
+user nobody
+group nobody
+persist-key
+persist-tun
+status /var/log/openvpn/openvpn-status.log
+verb 3
+explicit-exit-notify 1
+
+Save and exit.(ctrl+o ,enter, ctrl+x)
+
+️ Generate Certificates
+.........................
+Move to server folder:
+cd /etc/openvpn/server
+
+Diffie-Hellman Parameters
+sudo openssl dhparam -out dh.pem 2048
+
+CA Certificate
+sudo openssl req -new -newkey rsa:2048 -days 365 -nodes -x509 \
+-keyout ca.key -out ca.crt
+
+Server Certificate
+sudo openssl req -new -newkey rsa:2048 -days 365 -nodes \
+-keyout server.key -out server.crt
+
+️Enable IP Forwarding
+Edit sysctl:
+sudo nano /etc/sysctl.conf
+
+
+Uncomment/add:
+net.ipv4.ip_forward = 1
+
+
+Apply changes:
+sudo sysctl -p
+️
+Configure NAT / Masquerading
+sudo firewall-cmd --zone=public --add-masquerade --permanent
+sudo firewall-cmd --reload
+
+️ OpenVPN Firewall Rules
+sudo firewall-cmd --permanent --add-port=1194/udp
+sudo firewall-cmd --reload
+
+️ Start and Enable OpenVPN
+sudo systemctl start openvpn@server
+sudo systemctl enable openvpn@server
+
+
+Check status:
+sudo systemctl status openvpn@server
+
+️ Generate Client Certificates
+................................
+Replace client1 with your desired client name:
+sudo /usr/share/openvpn/easy-rsa/3/easyrsa gen-req client1
+sudo /usr/share/openvpn/easy-rsa/3/easyrsa sign-req client client1
+
+
+Copy these files to the client/ folder:
+client1.crt
+client1.key
+ca.crt
+
+E️xample Windows Client Configuration (nbashir-vpn.ovpn)
+.............................................
+Create nbashir-vpn.ovpn:
+
+client
+dev tun
+proto udp
+remote 192.168.193.128 1194
+resolv-retry infinite
+nobind
+persist-key
+persist-tun
+remote-cert-tls server
+cipher AES-256-CBC
+auth SHA256
+verb 3
+<ca>
+PASTE YOUR ca.crt CONTENT HERE
+</ca>
+<cert>
+PASTE YOUR client1.crt CONTENT HERE
+</cert>
+<key>
+PASTE YOUR client1.key CONTENT HERE
+</key>
+
+️Connect from Windows by:
+*Installing OpenVPN GUI for Windows
+*Copy nbashir-vpn.ovpn to:
+   C:\Program Files\OpenVPN\config\
+
+*Right-click OpenVPN GUI → Run as administrator.
+*Right-click tray icon → Connect.
+*Your client will connect to the Fedora VPN server securely.
+
+ Notes:
+Always keep certificates and keys secure.
+Test VPN connectivity locally before relying on it for production.
+
+Update server and client configurations as needed.
